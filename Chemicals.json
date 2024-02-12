@@ -1,0 +1,17 @@
+[
+    {
+      "Name": "Hydrochloric Acid",
+      "Symbol": "HCl",
+      "InitialConcentration": 0.1,
+      "pH": 1.0,
+      "Color": "Clear"
+    },
+    {
+      "Name": "Sodium Hydroxide",
+      "Symbol": "NaOH",
+      "InitialConcentration": 0.2,
+      "pH": 13.0,
+      "Color": "Clear"
+    }
+  ]
+  
