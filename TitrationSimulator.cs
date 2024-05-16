@@ -2,19 +2,54 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using Chemical;
+
 
 public class TitrationSimulator
 {
+    public class Chemical{
+        public string Name { get; set; }
+        public string Symbol { get; set; }
+        public double InitialConcentration { get; set; }
+        public double pH { get; set; }
+        public string Color { get; set; }
+    }
+
     private List<Chemical> chemicals;
+    private double simulationIncrement = 1.0;
 
     public TitrationSimulator(string jsonFilePath)
     {
-        string jsonContent = File.ReadAllText(jsonFilePath);
-        chemicals = JsonSerializer.Deserialize<List<Chemical>>(jsonContent);
+        LoadChemicals(jsonFilePath);
+    }
+
+    private void LoadChemicals(string jsonFilePath)
+    {
+        try
+        {
+            string jsonContent = File.ReadAllText(jsonFilePath);
+            chemicals = JsonSerializer.Deserialize<List<Chemical>>(jsonContent);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading chemicals: {ex.Message}");
+            chemicals = new List<Chemical>(); // Initialize an empty list
+        }
+    }
+
+    public void SetSimulationIncrement(double increment)
+    {
+        simulationIncrement = increment;
     }
 
     public void SimulateTitration()
     {
+        if (chemicals == null || chemicals.Count < 2)
+        {
+            Console.WriteLine("Error: Insufficient chemicals for simulation.");
+            return;
+        }
+
         Chemical acid = chemicals.Find(c => c.Name.Equals("Acid"));
         Chemical baseChem = chemicals.Find(c => c.Name.Equals("Base"));
 
@@ -22,7 +57,7 @@ public class TitrationSimulator
 
         while (true)
         {
-            double addedVolume = Math.Min(1.0, acid.InitialConcentration, baseChem.InitialConcentration);
+            double addedVolume = Math.Min(simulationIncrement, acid.InitialConcentration, baseChem.InitialConcentration);
 
             acid.InitialConcentration -= addedVolume;
             baseChem.InitialConcentration -= addedVolume;
@@ -41,28 +76,48 @@ public class TitrationSimulator
 
     private bool IsEndpointReached(Chemical acid, Chemical baseChem)
     {
-        // Consider the reaction complete if either solution is exhausted
+        // Check if either solution is exhausted
         if (acid.InitialConcentration <= 0 || baseChem.InitialConcentration <= 0)
         {
-            return true;
+            return true; // Endpoint reached if either solution is exhausted
         }
 
-        // Add more sophisticated endpoint detection criteria here
+        // Calculate the absolute difference in pH between the acid and base
         double deltaPH = Math.Abs(acid.pH - baseChem.pH);
 
         // Check for a significant change in pH
         if (deltaPH < 0.1)
         {
             // pH change is small, indicating the reaction is not complete
-            return false;
+            return false; // Endpoint not reached
         }
 
-        // Check for the rate of change of pH
-        double deltaPHRate = Math.Abs(acid.pH - baseChem.pH) / addedVolume; // Adjust based on your simulation increments
+        // Calculate the rate of change of pH
+        double deltaPHRate = deltaPH / simulationIncrement; // Adjust based on simulation increment
+
+        // Check if the rate of pH change is slow
         if (deltaPHRate < 0.05)
         {
             // Rate of pH change is slow, suggesting the reaction is nearing completion
-            return false;
+            return false; // Endpoint not reached
+        }
+
+        // Check if the acid or base concentration is very close to zero
+        if (acid.InitialConcentration < 0.01 || baseChem.InitialConcentration < 0.01)
+        {
+            // Concentration is very low, indicating the reaction is likely complete
+            return true; // Endpoint reached
+        }
+
+        // Check if the pH of either solution is close to a known endpoint pH value
+        double acidEndpointPH = 7.0; // Example endpoint pH for acid
+        double baseEndpointPH = 7.0; // Example endpoint pH for base
+        double pHThreshold = 0.1; // pH threshold for endpoint detection
+
+        if (Math.Abs(acid.pH - acidEndpointPH) < pHThreshold || Math.Abs(baseChem.pH - baseEndpointPH) < pHThreshold)
+        {
+            // pH of one of the solutions is close to the expected endpoint pH
+            return true; // Endpoint reached
         }
 
         // If none of the conditions above are met, consider the endpoint not reached
